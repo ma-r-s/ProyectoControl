@@ -8,13 +8,13 @@
 #define SERV 16
 #define BOTON 32
 
-double Kp = 0;
-double Ki = 0.1;
+double Kp = 0.8;
+double Ki = 0.05;
 double Kd = 0;
 
 double input;
 double driverOut = 0;
-double setPoint = 30.0; // Change to float
+double setPoint = 50.0; // Change to float
 
 PID myPID(&input, &driverOut, &setPoint, Kp, Ki, Kd, DIRECT);
 
@@ -43,6 +43,8 @@ void control(void *pvParameters)
     double error = setPoint - input;
     myPID.Compute();
     double controlSignal = driverOut;
+    Serial.print("Input: ");
+    Serial.println(input);
     Serial.print("Error: ");
     Serial.println(error);
 
@@ -50,9 +52,7 @@ void control(void *pvParameters)
     Serial.print("Control Signal: ");
     Serial.println(controlSignal);
 
-    // fly.write(driverOut);
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    fly.write(driverOut);
   }
 }
 
@@ -65,7 +65,7 @@ float leerDistancia(int trigPin, int echoPin) // Change return type to float
   digitalWrite(trigPin, LOW);
   long duration = pulseIn(echoPin, HIGH);
   float distance = duration * 0.034 / 2.0; // Change to float
-  return distance;
+  return distance - 7.77;
 }
 
 void sensor(void *pvParameters)
@@ -75,10 +75,6 @@ void sensor(void *pvParameters)
   for (;;)
   {
     dist = leerDistancia(TRG1, ECH1);
-    Serial.print(millis());
-    Serial.print(",");
-    Serial.println(dist);
-    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
 
