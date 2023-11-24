@@ -1,69 +1,73 @@
 #include <Arduino.h>
-#include <U8g2lib.h>
 #include <SPI.h>
 #include <ESP32Servo.h>
+#include <PID_v1.h>
 
 #define TRG1 14
 #define ECH1 27
 #define SERV 16
 #define BOTON 32
 
-U8G2_PCD8544_84X48_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/15, /* dc=*/4, /* reset=*/2); // Nokia 5110 Display
+double Kp = 0;
+double Ki = 0.1;
+double Kd = 0;
+
+double input;
+double driverOut = 0;
+double setPoint = 30.0; // Change to float
+
+PID myPID(&input, &driverOut, &setPoint, Kp, Ki, Kd, DIRECT);
+
 Servo fly;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 TaskHandle_t Task3;
-int dist = 0;
+float dist = 0; // Change from int to float
+
 void inicializarPines()
 {
   pinMode(BOTON, INPUT_PULLUP);
   fly.attach(SERV, 1000, 2000);
   fly.write(30);
 }
+
 void control(void *pvParameters)
 {
   inicializarPines();
-
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  myPID.SetMode(AUTOMATIC);
   for (;;)
   {
+
+    input = dist;
+    double error = setPoint - input;
+    myPID.Compute();
+    double controlSignal = driverOut;
+    Serial.print("Error: ");
+    Serial.println(error);
+
+    // Print the control signal value
+    Serial.print("Control Signal: ");
+    Serial.println(controlSignal);
+
+    // fly.write(driverOut);
+
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    fly.write(74);
   }
 }
 
-void pantalla(void *pvParameters)
-{
-  u8g2.begin();
-  u8g2.setFont(u8g2_font_helvR08_tr);
-  u8g2.setDrawColor(1);
-
-  for (;;)
-  {
-    u8g2.clearBuffer();
-    u8g2.drawStr(0, 9, "Distancia");
-    // show seconds
-    u8g2.setCursor(0, 18);
-    u8g2.print("cm: ");
-    u8g2.print(dist);
-
-    u8g2.sendBuffer();
-    vTaskDelay(400 / portTICK_PERIOD_MS);
-  }
-}
-int leerDistancia(int trigPin, int echoPin)
+float leerDistancia(int trigPin, int echoPin) // Change return type to float
 {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
-  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-  // Reads the echoPin, returns the sound wave travel time in microseconds
   long duration = pulseIn(echoPin, HIGH);
-  // Calculating the distance
-  int distance = min(duration * 0.034 / 2, 100.0); // Speed of sound wave divided by 2 (go and back)
+  float distance = duration * 0.034 / 2.0; // Change to float
   return distance;
 }
+
 void sensor(void *pvParameters)
 {
   pinMode(TRG1, OUTPUT);
@@ -74,40 +78,31 @@ void sensor(void *pvParameters)
     Serial.print(millis());
     Serial.print(",");
     Serial.println(dist);
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
 
 void setup()
 {
   Serial.begin(115200);
-  /* pin task to core 1 */
+
   xTaskCreatePinnedToCore(
-      pantalla,   /* Task function. */
-      "pantalla", /* name of task. */
-      10000,      /* Stack size of task */
-      NULL,       /* parameter of the task */
-      2,          /* priority of the task */
-      &Task1,     /* Task handle to keep track of created task */
+      control,
+      "pantalla",
+      10000,
+      NULL,
+      2,
+      &Task2,
       1);
   xTaskCreatePinnedToCore(
-      control,    /* Task function. */
-      "pantalla", /* name of task. */
-      10000,      /* Stack size of task */
-      NULL,       /* parameter of the task */
-      2,          /* priority of the task */
-      &Task2,     /* Task handle to keep track of created task */
-      1);
-  xTaskCreatePinnedToCore(
-      sensor,     /* Task function. */
-      "pantalla", /* name of task. */
-      10000,      /* Stack size of task */
-      NULL,       /* parameter of the task */
-      2,          /* priority of the task */
-      &Task3,     /* Task handle to keep track of created task */
+      sensor,
+      "pantalla",
+      10000,
+      NULL,
+      2,
+      &Task3,
       1);
 }
-/* pin task to core 1 */
 
 void loop()
 {
