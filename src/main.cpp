@@ -8,14 +8,33 @@
 #define SERV 16
 #define BOTON 32
 
-// Codigo magico
-//  double Kp = 0.597;
-//  double Ki = 0.931;
-//  double Kd = 0.0;
+// Sintesis directa P
+// double l = 0.4;
+// double Kp = 1.811 / (l * 1.169);
+// double Ki = 0;
+// double Kd = 0;
 
-double Kp = 0.7189;
-double Ki = 0.599;
-double Kd = 0.0;
+// Sintesis directa PI
+// double l = 4;
+// double Kp = 0.7758 / (l * 0.5082);
+// double Ki = 1 / (l * 0.5082);
+// double Kd = 0;
+
+// Sintesis directa PID
+// double l = 8;
+// double Kp = 1.811 / (l * 1.169);
+// double Ki = 1.917 / (l * 1.169);
+// double Kd = 1 / (l * 1.169);
+
+// Ziegler-Nichols PID
+// double Kp = 0.323;
+// double Ki = 1.433;
+// double Kd = 0.112;
+
+// Autotune
+// double Kp = 0.597;
+// double Ki = 0.931;
+// double Kd = 0.0;
 
 double input;
 double driverOut = 0;
@@ -38,6 +57,7 @@ void inicializarPines()
 
 void control(void *pvParameters)
 {
+  Serial.println("Tiempo, Distancia, Error, setPoint, Control");
   inicializarPines();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
   myPID.SetMode(AUTOMATIC);
@@ -48,15 +68,13 @@ void control(void *pvParameters)
     double error = setPoint - input;
     myPID.Compute();
     double controlSignal = driverOut;
-    // Serial.print("Input: ");
-    // Serial.println(input);
-    // Serial.print("Error: ");
-    // Serial.println(error);
-
-    // // Print the control signal value
-    // Serial.print("Control Signal: ");
-    // Serial.println(controlSignal);
     Serial.print(millis());
+    Serial.print(",");
+    Serial.print(dist);
+    Serial.print(",");
+    Serial.print(error);
+    Serial.print(",");
+    Serial.print(setPoint);
     Serial.print(",");
     Serial.println(controlSignal);
 
@@ -103,6 +121,17 @@ void sensor(void *pvParameters)
   }
 }
 
+void ponerSalida(void *pvParameters)
+{
+  for (;;)
+  {
+    setPoint = 60.0;
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // vTaskDelay(10000 / portTICK_PERIOD_MS);
+    // setPoint = 30.0;
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -122,6 +151,14 @@ void setup()
       NULL,
       2,
       &Task3,
+      1);
+  xTaskCreatePinnedToCore(
+      ponerSalida,
+      "pantalla",
+      10000,
+      NULL,
+      2,
+      &Task1,
       1);
 }
 
